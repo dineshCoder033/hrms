@@ -1,27 +1,36 @@
 const Lead = require('../models/Lead');
-const { getIsConnected } = require('../config/db');
-const { memoryStore } = require('./dataService');
+const ApiError = require('../errors/ApiError');
 
 const getAllLeads = async () => {
-  if (getIsConnected()) {
-    return await Lead.find().sort({ createdAt: -1 });
-  }
-  return memoryStore.leads;
+  return await Lead.find().sort({ createdAt: -1 });
+};
+
+const getLeadById = async (id) => {
+  const lead = await Lead.findById(id);
+  if (!lead) throw ApiError.notFound('Lead not found');
+  return lead;
 };
 
 const createLead = async (data) => {
-  if (getIsConnected()) {
-    return await Lead.create(data);
-  }
-  const newLead = {
-    ...data,
-    id: `lead-${Date.now()}`
-  };
-  memoryStore.leads.unshift(newLead);
-  return newLead;
+  return await Lead.create(data);
+};
+
+const updateLead = async (id, data) => {
+  const updated = await Lead.findByIdAndUpdate(id, data, { returnDocument: 'after', runValidators: true });
+  if (!updated) throw ApiError.notFound('Lead not found');
+  return updated;
+};
+
+const deleteLead = async (id) => {
+  const deleted = await Lead.findByIdAndDelete(id);
+  if (!deleted) throw ApiError.notFound('Lead not found');
+  return deleted;
 };
 
 module.exports = {
   getAllLeads,
-  createLead
+  getLeadById,
+  createLead,
+  updateLead,
+  deleteLead
 };

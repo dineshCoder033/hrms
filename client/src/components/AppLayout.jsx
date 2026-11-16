@@ -4,9 +4,11 @@ import TopScheduleBar from './TopScheduleBar';
 import SidebarNav from './SidebarNav';
 import NewTaskModal from './NewTaskModal';
 import NewEmployeeModal from './NewEmployeeModal';
+import MeetingsModal from './MeetingsModal';
 import { 
   fetchStats, 
   fetchSchedule, 
+  fetchMeetings,
   fetchLeads, 
   fetchTasks, 
   fetchEmployees, 
@@ -20,7 +22,7 @@ import {
   punchAttendance,
   createLeave,
   updateLeaveStatus,
-  processPayroll,
+  executeSalaryPayouts,
   updateGoal
 } from '../services/api';
 
@@ -28,6 +30,7 @@ export default function AppLayout() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [schedule, setSchedule] = useState(null);
+  const [meetings, setMeetings] = useState([]);
   const [leads, setLeads] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -39,6 +42,7 @@ export default function AppLayout() {
   // Modals & Toast
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [isMeetingsModalOpen, setIsMeetingsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   const navigate = useNavigate();
@@ -52,7 +56,7 @@ export default function AppLayout() {
     async function loadData() {
       setLoading(true);
       try {
-        const [st, sc, ld, tk, emp, att, lev, pay, sm] = await Promise.all([
+        const results = await Promise.allSettled([
           fetchStats(),
           fetchSchedule(),
           fetchLeads(),
@@ -61,18 +65,23 @@ export default function AppLayout() {
           fetchAttendance(),
           fetchLeaves(),
           fetchPayroll(),
-          fetchSummary()
+          fetchSummary(),
+          fetchMeetings()
         ]);
 
-        setStats(st);
-        setSchedule(sc);
-        setLeads(ld || []);
-        setTasks(tk || []);
-        setEmployees(emp || []);
-        setAttendance(att || []);
-        setLeaves(lev || []);
-        setPayrolls(pay || []);
-        setSummary(sm);
+        const val = (idx, fallback = null) =>
+          results[idx]?.status === 'fulfilled' ? results[idx].value : fallback;
+
+        setStats(val(0));
+        setSchedule(val(1));
+        setLeads(val(2, []));
+        setTasks(val(3, []));
+        setEmployees(val(4, []));
+        setAttendance(val(5, []));
+        setLeaves(val(6, []));
+        setPayrolls(val(7, []));
+        setSummary(val(8));
+        setMeetings(val(9, []));
       } catch (err) {
         console.error('Failed to load workspace data:', err);
         showToast(`Backend connection notice: ${err.message}`);
@@ -106,11 +115,21 @@ export default function AppLayout() {
 
   const handleAddEmployee = async (empData) => {
     try {
-      const created = await createEmployee(empData);
-      setEmployees(prev => [created, ...prev]);
-      showToast(`Team member "${created.name}" onboarded!`);
+      const res = await createEmployee(empData);
+      const newEmp = res?.employee || res;
+      setEmployees(prev => [newEmp, ...prev]);
+      showToast(`Team member "${newEmp.name || newEmp.firstName || 'New Employee'}" onboarded!`);
     } catch (err) {
       showToast(`Failed to onboard employee: ${err.message}`);
+    }
+  };
+
+  const reloadEmployees = async () => {
+    try {
+      const data = await fetchEmployees();
+      setEmployees(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to reload employees:', err);
     }
   };
 
@@ -145,11 +164,13 @@ export default function AppLayout() {
     }
   };
 
-  const handleProcessPayroll = async () => {
+  const handleProcessPayroll = async (month) => {
     try {
-      await processPayroll();
-      setPayrolls(prev => prev.map(p => ({ ...p, paymentStatus: 'Paid' })));
-      showToast(`All salaries processed & bank deposits triggered!`);
+      const targetMonth = month || new Date().toISOString().slice(0, 7);
+      await executeSalaryPayouts(targetMonth);
+      const updated = await fetchPayroll();
+      setPayrolls(updated || []);
+      showToast(`Salaries for ${targetMonth} processed & bank payouts triggered!`);
     } catch (err) {
       showToast(`Payroll processing notice: ${err.message}`);
     }
@@ -172,9 +193,13 @@ export default function AppLayout() {
     loading,
     stats,
     schedule,
+    meetings,
     leads,
     tasks,
     employees,
+    setEmployees,
+    reloadEmployees,
+    fetchEmployees: reloadEmployees,
     attendance,
     leaves,
     payrolls,
@@ -182,6 +207,7 @@ export default function AppLayout() {
     showToast,
     onOpenNewTask: () => setIsTaskModalOpen(true),
     onOpenAddEmployee: () => setIsEmployeeModalOpen(true),
+    onOpenMeetings: () => setIsMeetingsModalOpen(true),
     onUpdateTaskStatus: handleUpdateTaskStatus,
     onPunch: handlePunchAttendance,
     onApplyLeave: handleApplyLeave,
@@ -202,7 +228,8 @@ export default function AppLayout() {
 
       {/* Top Header */}
       <TopScheduleBar 
-        schedule={schedule}
+        meetings={meetings}
+        onOpenMeetings={() => setIsMeetingsModalOpen(true)}
         onOpenNotifications={() => showToast('You have upcoming calendar syncs today.')}
         onOpenProfile={() => navigate('/employees')}
       />
@@ -234,6 +261,14 @@ export default function AppLayout() {
         isOpen={isEmployeeModalOpen}
         onClose={() => setIsEmployeeModalOpen(false)}
         onAddEmployee={handleAddEmployee}
+      />
+
+      <MeetingsModal
+        isOpen={isMeetingsModalOpen}
+        onClose={() => {
+          setIsMeetingsModalOpen(false);
+          fetchMeetings().then(setMeetings).catch(() => {});
+        }}
       />
     </div>
   );

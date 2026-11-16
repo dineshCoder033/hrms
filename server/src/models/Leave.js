@@ -2,10 +2,14 @@ const mongoose = require('mongoose');
 const schemaOptions = require('./schemaOptions');
 
 const leaveSchema = new mongoose.Schema({
-  employeeId: { type: String, required: true },
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true, index: true },
   employeeName: { type: String, required: true },
   employeeAvatar: { type: String },
-  leaveType: { type: String, enum: ['Casual Leave', 'Sick Leave', 'Annual Leave', 'Maternity/Paternity', 'Unpaid'], required: true },
+  leaveType: { 
+    type: String, 
+    enum: ['Casual Leave', 'Sick Leave', 'Annual Leave', 'Maternity/Paternity', 'Unpaid'], 
+    required: true 
+  },
   startDate: { type: String, required: true },
   endDate: { type: String, required: true },
   daysCount: { type: Number, required: true },

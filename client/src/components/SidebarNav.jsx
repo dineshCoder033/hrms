@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   LayoutGrid, 
   Users, 
@@ -7,22 +8,36 @@ import {
   Clock, 
   CreditCard, 
   BriefcaseBusiness, 
-  Award 
+  Award,
+  FileText,
+  CalendarHeart,
+  ShieldAlert,
+  UserCircle,
+  Settings
 } from 'lucide-react';
 
 export default function SidebarNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role || 'Employee';
 
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutGrid },
-    { path: '/employees', label: 'Employees', icon: Users },
-    { path: '/attendance', label: 'Attendance', icon: CalendarDays },
-    { path: '/leaves', label: 'Leave Tracking', icon: Clock },
-    { path: '/payroll', label: 'Payroll', icon: CreditCard },
-    { path: '/recruitment', label: 'Recruitment', icon: BriefcaseBusiness },
-    { path: '/performance', label: 'Performance', icon: Award },
+  const allNavItems = [
+    { path: '/', label: 'Dashboard', icon: LayoutGrid, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/attendance', label: 'Attendance', icon: CalendarDays, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/recruitment', label: 'Recruitment', icon: BriefcaseBusiness, allowedRoles: ['Admin', 'HR', 'Employee'] },
+    { path: '/leaves', label: 'Time Off & Leaves', icon: Clock, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/holidays', label: 'Holidays', icon: CalendarHeart, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/employees', label: 'Employees', icon: Users, allowedRoles: ['Admin', 'HR', 'Manager'] },
+    { path: '/my-payslips', label: 'My Payslips', icon: FileText, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/payroll', label: 'Payroll', icon: CreditCard, allowedRoles: ['Admin', 'HR'] },
+    { path: '/audit-logs', label: 'Audit Logs', icon: ShieldAlert, allowedRoles: ['Admin'] },
+    { path: '/settings', label: 'System Settings', icon: Settings, allowedRoles: ['Admin'] },
+    { path: '/profile', label: 'My Profile', icon: UserCircle, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
   ];
+
+  // Role-based navigation filtering (Employee will not see Payroll or Recruitment menus)
+  const navItems = allNavItems.filter(item => item.allowedRoles.includes(role));
 
   return (
     <aside className="w-12 sm:w-14 shrink-0 flex flex-col items-center">

@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
-  const [isRegister, setIsRegister] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('dinesh.hr@taskorbit.com');
-  const [password, setPassword] = useState('Password@123');
-  const [role, setRole] = useState('HR');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -24,70 +22,46 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      if (isRegister) {
-        await register({ name, email, password, role });
-      } else {
-        await login(email, password);
-      }
+      await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || 'Authentication failed. Please check your credentials.');
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleQuickDemo = (demoEmail, demoRole) => {
-    setEmail(demoEmail);
-    setPassword('Password@123');
-    setRole(demoRole);
-    setIsRegister(false);
-  };
-
   return (
-    <div className="w-screen h-screen min-h-screen bg-[#0D0F12] text-white flex items-center justify-center p-4 relative overflow-hidden select-none">
-      {/* Ambient Glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#C7F436]/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
+    <div className="w-screen h-screen min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#F1F5F9] to-[#E2E8F0] text-gray-900 flex items-center justify-center p-4 relative overflow-hidden select-none">
+      
+      {/* Soft Ambient Background Elements */}
+      <div className="absolute top-12 left-1/4 w-96 h-96 bg-lime-200/50 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-12 right-1/4 w-96 h-96 bg-emerald-200/40 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Main Container Card */}
-      <div className="w-full max-w-md bg-[#16191F]/90 backdrop-blur-xl border border-white/10 rounded-4xl p-7 sm:p-9 shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-300">
+      {/* Main Container Card (Clean Light Theme) */}
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl border border-gray-200/80 rounded-4xl p-7 sm:p-9 shadow-2xl shadow-gray-200/60 relative z-10 animate-in fade-in zoom-in-95 duration-300">
         
         {/* Logo & Brand Header */}
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-12 h-12 rounded-2xl bg-black border border-white/10 flex items-center justify-center shadow-lg mb-3">
-            <span className="w-4 h-4 rounded-full bg-[#C7F436] inline-block shadow-[0_0_12px_#C7F436]" />
+          <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center p-2.5 shadow-md mb-3">
+            <svg viewBox="0 0 24 24" className="w-full h-full text-white fill-current">
+              <path d="M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.2l6.8 3.8L12 11.8 5.2 8 12 4.2zM5 9.8l6.8 3.4v6.6l-6-3.3V9.8zm8 10v-6.6l6-3.4v6.7l-6 3.3z" fill="#C7F436" />
+            </svg>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-1">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900 flex items-center gap-1.5">
             <span>TaskOrbit</span>
-            <span className="text-[#C7F436] font-extrabold text-xs bg-white/10 px-2 py-0.5 rounded-full border border-white/10">HRMS</span>
+            <span className="text-black font-extrabold text-[11px] bg-[#C7F436] px-2 py-0.5 rounded-full shadow-2xs">
+              HRMS
+            </span>
           </h1>
-          <p className="text-xs text-gray-400 font-medium mt-1">
-            {isRegister ? 'Create an enterprise workspace account' : 'Sign in to access your workforce dashboard'}
+          <p className="text-xs text-gray-500 font-medium mt-1">
+            Sign in to access your enterprise workspace & workforce portal
           </p>
-        </div>
-
-        {/* Tab Toggle */}
-        <div className="grid grid-cols-2 bg-black/40 p-1 rounded-2xl border border-white/5 mb-6 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => { setIsRegister(false); setError(null); }}
-            className={`py-2 rounded-xl transition ${!isRegister ? 'bg-white text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => { setIsRegister(true); setError(null); }}
-            className={`py-2 rounded-xl transition ${isRegister ? 'bg-white text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
-          >
-            Create Account
-          </button>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+          <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
             <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
             <span>{error}</span>
           </div>
@@ -95,111 +69,70 @@ export default function LoginPage() {
 
         {/* Auth Form */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {isRegister && (
-            <div>
-              <label className="block text-gray-400 font-semibold mb-1.5">Full Name</label>
-              <div className="flex items-center gap-2 bg-black/50 border border-white/10 focus-within:border-[#C7F436] rounded-2xl px-3.5 py-2.5 transition">
-                <User className="w-4 h-4 text-gray-500 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="e.g. Alex Miller"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-transparent text-white placeholder-gray-600 focus:outline-none w-full text-xs"
-                  required
-                />
-              </div>
-            </div>
-          )}
-
           <div>
-            <label className="block text-gray-400 font-semibold mb-1.5">Work Email</label>
-            <div className="flex items-center gap-2 bg-black/50 border border-white/10 focus-within:border-[#C7F436] rounded-2xl px-3.5 py-2.5 transition">
-              <Mail className="w-4 h-4 text-gray-500 shrink-0" />
+            <label className="block text-gray-700 font-bold mb-1.5">Work Email</label>
+            <div className="flex items-center gap-2 bg-gray-50 hover:bg-gray-50/80 border border-gray-200 focus-within:border-black focus-within:bg-white rounded-2xl px-3.5 py-2.5 transition">
+              <Mail className="w-4 h-4 text-gray-400 shrink-0" />
               <input
                 type="email"
-                placeholder="name@taskorbit.com"
+                placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-transparent text-white placeholder-gray-600 focus:outline-none w-full text-xs"
+                className="bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none w-full text-xs font-medium"
                 required
+                autoComplete="email"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-gray-400 font-semibold mb-1.5">Password</label>
-            <div className="flex items-center gap-2 bg-black/50 border border-white/10 focus-within:border-[#C7F436] rounded-2xl px-3.5 py-2.5 transition">
-              <Lock className="w-4 h-4 text-gray-500 shrink-0" />
+            <label className="block text-gray-700 font-bold mb-1.5">Password</label>
+            <div className="flex items-center gap-2 bg-gray-50 hover:bg-gray-50/80 border border-gray-200 focus-within:border-black focus-within:bg-white rounded-2xl px-3.5 py-2.5 transition">
+              <Lock className="w-4 h-4 text-gray-400 shrink-0" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="bg-transparent text-white placeholder-gray-600 focus:outline-none w-full text-xs"
+                className="bg-transparent text-gray-900 placeholder-gray-400 focus:outline-none w-full text-xs font-medium"
                 required
+                autoComplete="current-password"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
-
-          {isRegister && (
-            <div>
-              <label className="block text-gray-400 font-semibold mb-1.5">Role Assignment</label>
-              <div className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-2xl px-3.5 py-2.5">
-                <ShieldCheck className="w-4 h-4 text-gray-500 shrink-0" />
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="bg-transparent text-white focus:outline-none w-full text-xs"
-                >
-                  <option value="Employee" className="bg-[#16191F]">Employee</option>
-                  <option value="Manager" className="bg-[#16191F]">Manager</option>
-                  <option value="HR" className="bg-[#16191F]">HR Specialist</option>
-                  <option value="Admin" className="bg-[#16191F]">System Admin</option>
-                </select>
-              </div>
-            </div>
-          )}
 
           {/* Submit Button */}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full mt-2 bg-[#C7F436] hover:bg-[#b8e52b] text-black font-extrabold text-xs py-3 rounded-2xl transition shadow-lg shadow-[#C7F436]/20 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full mt-3 bg-black hover:bg-neutral-800 text-white font-extrabold text-xs py-3.5 rounded-2xl transition shadow-md active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? (
-              <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <span>{isRegister ? 'Complete Onboarding' : 'Sign In to Workspace'}</span>
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Sign In to Workspace</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5] text-[#C7F436]" />
               </>
             )}
           </button>
         </form>
 
-        {/* Quick Demo Logins Helper */}
-        <div className="mt-6 pt-5 border-t border-white/5">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block text-center mb-2.5">
-            Quick Demo Accounts
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('dinesh.hr@taskorbit.com', 'HR')}
-              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 py-1.5 px-2 rounded-xl text-[11px] font-bold text-gray-300 transition text-center"
-            >
-              Demo as HR
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('sophia.m@taskorbit.com', 'Employee')}
-              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 py-1.5 px-2 rounded-xl text-[11px] font-bold text-gray-300 transition text-center"
-            >
-              Demo as Employee
-            </button>
-          </div>
+        <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Secured with End-to-End Enterprise RBAC</span>
         </div>
+
+        <p className="text-[11px] text-gray-400 text-center mt-2 font-medium">
+          Need an account or password reset? Please contact your HR Admin.
+        </p>
 
       </div>
     </div>

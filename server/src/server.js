@@ -1,36 +1,47 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
-require('dotenv').config();
+const env = require('./config/env');
 
 const { connectDB } = require('./config/db');
-const { autoSeedMongoIfConnected } = require('./services/dataService');
+const { autoSeedIfEmpty } = require('./seed/initSeed');
 const routes = require('./routes');
 const { apiLimiter } = require('./middlewares/rateLimiter');
 const errorHandler = require('./errors/errorHandler');
 const ApiError = require('./errors/ApiError');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const PORT = env.PORT;
+const CLIENT_URL = env.CLIENT_URL;
+
+// Trust reverse proxy (Render, Railway, Nginx, Cloudflare) so rate-limit & req.ip work accurately
+app.set('trust proxy', 1);
 
 // Security Headers
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
-// Restricted CORS
-const allowedOrigins = [
-  CLIENT_URL,
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:3000'
-];
+// Restricted CORS supporting comma-separated CLIENT_URLs
+const configuredOrigins = CLIENT_URL.split(',')
+  .map((u) => u.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const devOrigins = env.NODE_ENV !== 'production'
+  ? ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000']
+  : [];
+
+const allowedOrigins = Array.from(new Set([...configuredOrigins, ...devOrigins]));
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalized = origin ? origin.replace(/\/$/, '') : null;
+    if (!normalized || allowedOrigins.includes(normalized)) {
       return callback(null, true);
     }
     return callback(new ApiError(403, `CORS policy: Origin ${origin} not allowed`));
@@ -40,23 +51,25 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+// Mount Webhook Routes BEFORE express.json() for raw body HMAC signature verification
+const webhookRoutes = require('./routes/webhookRoutes');
+app.use('/api/webhooks', webhookRoutes);
+
 // Body parsing & Rate Limiting
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use('/api', apiLimiter);
 
-// Request Logger
-if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('dev'));
-}
-
-// Health check
+// Health check for hosting platforms (Render / Railway / Docker)
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
+  const dbReady = mongoose.connection.readyState === 1;
+  res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? 'online' : 'degraded',
+    db: dbReady ? 'connected' : 'disconnected',
     system: 'TaskOrbit / Helix HRMS Core API',
-    environment: process.env.NODE_ENV || 'development',
+    environment: env.NODE_ENV,
+    uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString()
   });
 });
@@ -64,7 +77,17 @@ app.get('/api/health', (req, res) => {
 // Mount All API Routes
 app.use('/api', routes);
 
-// 404 Handler
+// Optional Single-Server Hosting: serve built React client if present
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+if (env.NODE_ENV === 'production' && fs.existsSync(path.join(clientDistPath, 'index.html'))) {
+  app.use(express.static(clientDistPath, { maxAge: '7d' }));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
+// 404 Handler for unmatched API routes
 app.use((req, res, next) => {
   next(ApiError.notFound(`Route not found: ${req.method} ${req.originalUrl}`));
 });
@@ -72,32 +95,38 @@ app.use((req, res, next) => {
 // Centralized Error Handler Middleware
 app.use(errorHandler);
 
-// Start Server & Connect Database
+// Start Server & Connect Database (skipped in Jest test mode)
 const startServer = async () => {
   await connectDB();
-  await autoSeedMongoIfConnected();
+  await autoSeedIfEmpty();
 
   const server = app.listen(PORT, () => {
-    console.log(`===============================================`);
-    console.log(`🚀 TaskOrbit HRMS Server running on port ${PORT}`);
-    console.log(`🌐 API Endpoint: http://localhost:${PORT}/api`);
-    console.log(`🔒 Allowed Client Origin: ${CLIENT_URL}`);
-    console.log(`===============================================`);
+    console.log(`server running 🚀`);
   });
 
   // Graceful shutdown
-  const shutdown = () => {
-    console.log('\n[TaskOrbit HRMS] Gracefully shutting down...');
-    server.close(() => {
-      console.log('[TaskOrbit HRMS] HTTP server closed.');
+  const shutdown = async (signal) => {
+    console.log(`\n[TaskOrbit HRMS] ${signal} received. Gracefully shutting down...`);
+    server.close(async () => {
+      try {
+        await mongoose.connection.close();
+        console.log('[TaskOrbit HRMS] HTTP server & MongoDB connection closed.');
+      } catch (err) {
+        console.error('[TaskOrbit HRMS] Error closing MongoDB:', err.message);
+      }
       process.exit(0);
     });
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('unhandledRejection', (reason) => {
+    console.error('[TaskOrbit HRMS] Unhandled Promise Rejection:', reason);
+  });
 };
 
-startServer();
+if (env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 module.exports = app;

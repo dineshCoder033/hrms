@@ -17,8 +17,7 @@ export const checkHealth = async () => {
   return res.data;
 };
 
-
-// Request interceptor to attach JWT token
+// Request interceptor to attach JWT access token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('taskorbit_token');
   if (token) {
@@ -27,12 +26,39 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for consistent error extraction
+// Response interceptor with silent automatic refresh on TOKEN_EXPIRED
+let refreshing = null;
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (r) => r,
+  async (error) => {
+    const original = error.config;
+    const expired = error.response?.status === 401 && error.response?.data?.message === 'TOKEN_EXPIRED';
+
+    if (expired && !original._retry) {
+      original._retry = true;
+      refreshing ??= axios
+        .post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true })
+        .then((r) => r.data.data.accessToken)
+        .finally(() => {
+          refreshing = null;
+        });
+
+      try {
+        const newToken = await refreshing;
+        localStorage.setItem('taskorbit_token', newToken);
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      } catch (refreshErr) {
+        localStorage.removeItem('taskorbit_token');
+        localStorage.removeItem('taskorbit_user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshErr);
+      }
+    }
+
     const errorMsg = error.response?.data?.message || error.message || 'Unknown network error';
-    console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, errorMsg);
     return Promise.reject(new Error(errorMsg));
   }
 );
@@ -43,9 +69,9 @@ export const loginApi = async (credentials) => {
   return res.data.data;
 };
 
-export const registerApi = async (userData) => {
-  const res = await api.post('/auth/register', userData);
-  return res.data.data;
+export const setPasswordApi = async (data) => {
+  const res = await api.post('/auth/set-password', data);
+  return res.data;
 };
 
 export const fetchMeApi = async () => {
@@ -58,6 +84,48 @@ export const logoutApi = async () => {
   return res.data;
 };
 
+// User Management (Admin / HR)
+export const createUserApi = async (userData) => {
+  const res = await api.post('/users', userData);
+  return res.data.data;
+};
+
+export const fetchUsersApi = async () => {
+  const res = await api.get('/users');
+  return res.data.data;
+};
+
+// Bulk Import & Employee Management (Phase 2)
+export const downloadEmployeeTemplate = () => {
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  window.open(`${base}/employees/import/template`, '_blank');
+};
+
+export const previewEmployeeImport = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await api.post('/employees/import/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return res.data.data;
+};
+
+export const commitEmployeeImport = async (importId) => {
+  const res = await api.post('/employees/import/commit', { importId });
+  return res.data.data;
+};
+
+export const uploadEmployeeDocument = async (employeeId, file, type = 'General') => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', type);
+  const res = await api.post(`/employees/${employeeId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return res.data.data;
+};
+
+// Stats & Dashboard
 export const fetchStats = async () => {
   const res = await api.get('/stats');
   return res.data.data;
@@ -78,6 +146,16 @@ export const createLead = async (data) => {
   return res.data.data;
 };
 
+export const updateLead = async (id, data) => {
+  const res = await api.patch(`/leads/${id}`, data);
+  return res.data.data;
+};
+
+export const deleteLead = async (id) => {
+  const res = await api.delete(`/leads/${id}`);
+  return res.data;
+};
+
 export const fetchTasks = async () => {
   const res = await api.get('/tasks');
   return res.data.data;
@@ -93,8 +171,18 @@ export const updateTask = async (id, data) => {
   return res.data.data;
 };
 
+export const deleteTask = async (id) => {
+  const res = await api.delete(`/tasks/${id}`);
+  return res.data;
+};
+
 export const fetchEmployees = async () => {
   const res = await api.get('/employees');
+  return res.data.data;
+};
+
+export const fetchEmployeeById = async (id) => {
+  const res = await api.get(`/employees/${id}`);
   return res.data.data;
 };
 
@@ -103,23 +191,106 @@ export const createEmployee = async (data) => {
   return res.data.data;
 };
 
-export const fetchAttendance = async () => {
-  const res = await api.get('/attendance');
+export const updateEmployee = async (id, data) => {
+  const res = await api.patch(`/employees/${id}`, data);
+  return res.data.data;
+};
+
+export const deleteEmployee = async (id) => {
+  const res = await api.delete(`/employees/${id}`);
+  return res.data;
+};
+
+export const fetchAttendance = async (params = {}) => {
+  const res = await api.get('/attendance', { params });
   return res.data.data;
 };
 
 export const fetchAttendanceMonthlyReport = async (params = {}) => {
-  const res = await api.get('/attendance/monthly-report', { params });
+  const res = await api.get('/attendance/report', { params });
   return res.data.data;
 };
 
-export const punchAttendance = async (type = 'in') => {
-  const res = await api.post('/attendance/punch', { type });
+export const fetchNearestOffice = async (lat, lng) => {
+  const res = await api.get('/attendance/nearest-office', { params: { lat, lng } });
+  return res.data.data;
+};
+
+export const punchAttendance = async (payload = 'in') => {
+  const body = typeof payload === 'string' ? { type: payload } : payload;
+  const res = await api.post('/attendance/punch', body);
   return res.data;
 };
 
-export const fetchLeaves = async () => {
-  const res = await api.get('/leaves');
+export const reviewPunchApi = async (id, data) => {
+  const res = await api.patch(`/attendance/${id}/review`, data);
+  return res.data;
+};
+
+// --- OFFICE LOCATIONS ---
+export const fetchLocations = async () => {
+  const res = await api.get('/locations');
+  return res.data.data;
+};
+
+export const createLocationApi = async (data) => {
+  const res = await api.post('/locations', data);
+  return res.data.data;
+};
+
+export const updateLocationApi = async (id, data) => {
+  const res = await api.patch(`/locations/${id}`, data);
+  return res.data.data;
+};
+
+export const deleteLocationApi = async (id) => {
+  const res = await api.delete(`/locations/${id}`);
+  return res.data;
+};
+
+// --- MEETINGS & SCHEDULING (PHASE 4) ---
+export const fetchMeetings = async (params = {}) => {
+  const res = await api.get('/meetings', { params });
+  return res.data.data;
+};
+
+export const fetchMeetingById = async (id) => {
+  const res = await api.get(`/meetings/${id}`);
+  return res.data.data;
+};
+
+export const createMeetingApi = async (data) => {
+  const res = await api.post('/meetings', data);
+  return res.data;
+};
+
+export const updateMeetingApi = async (id, data) => {
+  const res = await api.patch(`/meetings/${id}`, data);
+  return res.data;
+};
+
+export const cancelMeetingApi = async (id) => {
+  const res = await api.delete(`/meetings/${id}`);
+  return res.data;
+};
+
+export const respondToMeetingApi = async (id, response) => {
+  const res = await api.post(`/meetings/${id}/respond`, { response });
+  return res.data;
+};
+
+export const checkMeetingAvailability = async (params) => {
+  const res = await api.get('/meetings/availability', { params });
+  return res.data.data;
+};
+
+export const getMeetingIcsUrl = (id) => {
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  return `${base}/meetings/${id}/ics`;
+};
+
+export const fetchLeaves = async (params = {}) => {
+  const res = await api.get('/leaves', { params });
   return res.data.data;
 };
 
@@ -134,17 +305,33 @@ export const createLeave = async (data) => {
 };
 
 export const updateLeaveStatus = async (id, status) => {
-  const res = await api.patch(`/leaves/${id}`, { status });
+  const res = await api.patch(`/leaves/${id}/status`, { status });
   return res.data.data;
 };
 
-export const fetchPayroll = async () => {
-  const res = await api.get('/payroll');
+export const fetchPayroll = async (params = {}) => {
+  const res = await api.get('/payroll', { params });
   return res.data.data;
 };
+export const fetchPayrolls = fetchPayroll;
 
 export const generatePayrollRun = async (month) => {
   const res = await api.post('/payroll/generate', { month });
+  return res.data;
+};
+
+export const updateDraftPayroll = async (id, data) => {
+  const res = await api.patch(`/payroll/${id}`, data);
+  return res.data.data;
+};
+
+export const approvePayrollRun = async (month) => {
+  const res = await api.post('/payroll/approve', { month });
+  return res.data;
+};
+
+export const executeSalaryPayouts = async (month, provider = 'MockProvider') => {
+  const res = await api.post('/payroll/payout', { month, provider });
   return res.data;
 };
 
@@ -153,10 +340,29 @@ export const fetchPayslip = async (id) => {
   return res.data.data;
 };
 
-export const processPayroll = async () => {
-  const res = await api.post('/payroll/pay-all');
+// --- HOLIDAYS ---
+export const fetchHolidays = async (year) => {
+  const res = await api.get('/holidays', { params: { year } });
+  return res.data.data;
+};
+
+export const createHoliday = async (data) => {
+  const res = await api.post('/holidays', data);
+  return res.data.data;
+};
+export const createHolidayApi = createHoliday;
+
+export const updateHoliday = async (id, data) => {
+  const res = await api.patch(`/holidays/${id}`, data);
+  return res.data.data;
+};
+export const updateHolidayApi = updateHoliday;
+
+export const deleteHoliday = async (id) => {
+  const res = await api.delete(`/holidays/${id}`);
   return res.data;
 };
+export const deleteHolidayApi = deleteHoliday;
 
 export const fetchSummary = async () => {
   const res = await api.get('/summary');
@@ -221,5 +427,53 @@ export const getExportUrl = (type) => {
   return `${base}/export/${type}`;
 };
 
-export default api;
+// --- SELF-SERVICE PROFILE & PASSWORD ---
+export const fetchOwnProfile = async () => {
+  const res = await api.get('/employees/profile');
+  return res.data.data;
+};
 
+export const updateOwnProfile = async (data) => {
+  const res = await api.patch('/employees/profile', data);
+  return res.data.data;
+};
+
+export const changePassword = async (data) => {
+  const res = await api.post('/auth/change-password', data);
+  return res.data;
+};
+
+// --- NOTIFICATIONS ---
+export const fetchNotifications = async (limit = 20) => {
+  const res = await api.get('/notifications', { params: { limit } });
+  return res.data.data;
+};
+
+export const markNotificationRead = async (id) => {
+  const res = await api.patch(`/notifications/${id}/read`);
+  return res.data.data;
+};
+
+export const markAllNotificationsRead = async () => {
+  const res = await api.patch('/notifications/read-all');
+  return res.data;
+};
+
+// --- AUDIT LOGS (Admin & HR) ---
+export const fetchAuditLogs = async (params = {}) => {
+  const res = await api.get('/audit-logs', { params });
+  return res.data.data;
+};
+
+// --- SYSTEM SETTINGS & WORK SHIFT PUNCH TIMINGS ---
+export const fetchSystemSettings = async () => {
+  const res = await api.get('/settings');
+  return res.data.data;
+};
+
+export const updateSystemSettings = async (data) => {
+  const res = await api.patch('/settings', data);
+  return res.data.data;
+};
+
+export default api;

@@ -11,9 +11,13 @@ import {
   HeartPulse
 } from 'lucide-react';
 import ApplyLeaveModal from '../components/ApplyLeaveModal';
+import { useAuth } from '../context/AuthContext';
 
 export default function LeavesPage(props) {
   const context = useOutletContext() || {};
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
   const leaves = props.leaves ?? context.leaves ?? [];
   const onApplyLeave = props.onApplyLeave ?? context.onApplyLeave;
   const onUpdateStatus = props.onUpdateStatus ?? context.onUpdateLeaveStatus ?? props.onUpdateStatus;
@@ -151,20 +155,26 @@ export default function LeavesPage(props) {
                 </div>
 
                 {req.status === 'Pending' ? (
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => onUpdateStatus(req.id, 'Approved')}
-                      className="px-3.5 py-1.5 rounded-full bg-[#C7F436] hover:bg-[#B8E52B] text-black font-bold text-xs flex items-center gap-1 transition shadow-xs"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" /> Approve
-                    </button>
-                    <button 
-                      onClick={() => onUpdateStatus(req.id, 'Rejected')}
-                      className="px-3.5 py-1.5 rounded-full bg-gray-200 hover:bg-rose-100 hover:text-rose-700 text-gray-700 font-bold text-xs flex items-center gap-1 transition"
-                    >
-                      <XCircle className="w-3.5 h-3.5" /> Reject
-                    </button>
-                  </div>
+                  isAdmin ? (
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => onUpdateStatus(req.id, 'Approved')}
+                        className="px-3.5 py-1.5 rounded-full bg-[#C7F436] hover:bg-[#B8E52B] text-black font-bold text-xs flex items-center gap-1 transition shadow-xs"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Approve
+                      </button>
+                      <button 
+                        onClick={() => onUpdateStatus(req.id, 'Rejected')}
+                        className="px-3.5 py-1.5 rounded-full bg-gray-200 hover:bg-rose-100 hover:text-rose-700 text-gray-700 font-bold text-xs flex items-center gap-1 transition"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-bold text-xs flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> Awaiting Admin Approval
+                    </span>
+                  )
                 ) : (
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                     req.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'

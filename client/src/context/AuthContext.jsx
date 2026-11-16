@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginApi, registerApi, fetchMeApi, logoutApi } from '../services/api';
+import { loginApi, fetchMeApi, logoutApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -38,14 +38,6 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const register = async (userData) => {
-    const data = await registerApi(userData);
-    localStorage.setItem('taskorbit_token', data.accessToken);
-    setToken(data.accessToken);
-    setUser(data.user);
-    return data.user;
-  };
-
   const logout = async () => {
     try {
       await logoutApi();
@@ -62,9 +54,8 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
-    isAuthenticated: Boolean(user || token),
+    isAuthenticated: !!token && !!user,
     login,
-    register,
     logout
   };
 

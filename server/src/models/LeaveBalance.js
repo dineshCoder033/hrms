@@ -15,20 +15,20 @@ balanceItemSchema.virtual('remaining').get(function () {
 });
 
 const leaveBalanceSchema = new mongoose.Schema({
-  employeeId: { type: String, required: true, index: true },
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true, index: true },
   year: { type: Number, default: () => new Date().getFullYear(), index: true },
   balances: {
     'Annual Leave': { 
       type: balanceItemSchema, 
-      default: () => ({ total: 20, used: 5 }) 
+      default: () => ({ total: 20, used: 0 }) 
     },
     'Casual Leave': { 
       type: balanceItemSchema, 
-      default: () => ({ total: 10, used: 2 }) 
+      default: () => ({ total: 10, used: 0 }) 
     },
     'Sick Leave': { 
       type: balanceItemSchema, 
-      default: () => ({ total: 10, used: 1 }) 
+      default: () => ({ total: 10, used: 0 }) 
     },
     'Maternity/Paternity': { 
       type: balanceItemSchema, 

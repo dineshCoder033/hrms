@@ -1,41 +1,36 @@
 const Task = require('../models/Task');
-const { getIsConnected } = require('../config/db');
-const { memoryStore } = require('./dataService');
 const ApiError = require('../errors/ApiError');
 
 const getAllTasks = async () => {
-  if (getIsConnected()) {
-    return await Task.find().sort({ createdAt: -1 });
-  }
-  return memoryStore.tasks;
+  return await Task.find().sort({ createdAt: -1 });
+};
+
+const getTaskById = async (id) => {
+  const task = await Task.findById(id);
+  if (!task) throw ApiError.notFound('Task not found');
+  return task;
 };
 
 const createTask = async (data) => {
-  if (getIsConnected()) {
-    return await Task.create(data);
-  }
-  const newTask = {
-    ...data,
-    id: `task-${Date.now()}`
-  };
-  memoryStore.tasks.push(newTask);
-  return newTask;
+  return await Task.create(data);
 };
 
 const updateTask = async (id, data) => {
-  if (getIsConnected()) {
-    const updated = await Task.findByIdAndUpdate(id, data, { new: true, runValidators: true });
-    if (!updated) throw ApiError.notFound('Task not found');
-    return updated;
-  }
-  const task = memoryStore.tasks.find(t => t.id === id || t._id?.toString() === id);
-  if (!task) throw ApiError.notFound('Task not found');
-  Object.assign(task, data);
-  return task;
+  const updated = await Task.findByIdAndUpdate(id, data, { returnDocument: 'after', runValidators: true });
+  if (!updated) throw ApiError.notFound('Task not found');
+  return updated;
+};
+
+const deleteTask = async (id) => {
+  const deleted = await Task.findByIdAndDelete(id);
+  if (!deleted) throw ApiError.notFound('Task not found');
+  return deleted;
 };
 
 module.exports = {
   getAllTasks,
+  getTaskById,
   createTask,
-  updateTask
+  updateTask,
+  deleteTask
 };

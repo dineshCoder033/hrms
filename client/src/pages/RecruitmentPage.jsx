@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Briefcase, Plus, UserPlus, CheckCircle, Clock, ArrowUpRight, Search, X, Building, DollarSign, MapPin } from 'lucide-react';
 import { fetchJobs, createJob, fetchCandidates, updateCandidateStage } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function RecruitmentPage(props) {
   const context = useOutletContext() || {};
+  const { user } = useAuth();
+  const isAdminOrHr = ['Admin', 'HR'].includes(user?.role);
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,13 +93,15 @@ export default function RecruitmentPage(props) {
           <p className="text-xs text-gray-500 font-medium mt-0.5">Applicant tracking pipeline, hiring workflows, and active requisitions</p>
         </div>
 
-        <button 
-          onClick={() => setShowJobModal(true)}
-          className="flex items-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold text-xs px-4 py-2.5 rounded-full transition shadow-md active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Post New Job</span>
-        </button>
+        {isAdminOrHr && (
+          <button 
+            onClick={() => setShowJobModal(true)}
+            className="flex items-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold text-xs px-4 py-2.5 rounded-full transition shadow-md active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Post New Job</span>
+          </button>
+        )}
       </div>
 
       {/* Active Job Openings Cards */}
@@ -135,7 +140,8 @@ export default function RecruitmentPage(props) {
         </div>
       </div>
 
-      {/* Candidates Pipeline */}
+      {/* Candidates Pipeline (Admin & HR Only) */}
+      {isAdminOrHr && (
       <div className="bg-white p-6 rounded-4xl border border-gray-200/70 shadow-soft-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-2">
@@ -231,6 +237,7 @@ export default function RecruitmentPage(props) {
           )}
         </div>
       </div>
+      )}
 
       {/* Post New Job Modal */}
       {showJobModal && (

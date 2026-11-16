@@ -1,8 +1,14 @@
 const leaveService = require('../services/leaveService');
+const { employeeScope } = require('../utils/scope');
 
 const getLeaves = async (req, res, next) => {
   try {
-    const data = await leaveService.getAllLeaves(req.query);
+    const scope = await employeeScope(req.user);
+    const filter = { ...scope };
+    if (req.query.status && req.query.status !== 'All') {
+      filter.status = req.query.status;
+    }
+    const data = await leaveService.getAllLeaves(filter);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -11,9 +17,12 @@ const getLeaves = async (req, res, next) => {
 
 const getBalance = async (req, res, next) => {
   try {
-    const employeeId = req.query.employeeId || req.user?.employeeId || 'emp-1';
+    const targetEmployeeId = ['Admin', 'HR'].includes(req.user.role) && req.query.employeeId
+      ? req.query.employeeId
+      : req.user.employeeId;
+
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
-    const data = await leaveService.getLeaveBalance(employeeId, year);
+    const data = await leaveService.getLeaveBalance(targetEmployeeId, year);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -22,12 +31,7 @@ const getBalance = async (req, res, next) => {
 
 const createLeave = async (req, res, next) => {
   try {
-    const leavePayload = {
-      ...req.body,
-      employeeId: req.user?.employeeId || req.user?.id || req.body.employeeId,
-      employeeName: req.user?.name || req.body.employeeName
-    };
-    const data = await leaveService.createLeave(leavePayload);
+    const data = await leaveService.createLeave(req.body, req.user);
     res.status(201).json({ success: true, data });
   } catch (error) {
     next(error);
@@ -36,8 +40,7 @@ const createLeave = async (req, res, next) => {
 
 const updateLeaveStatus = async (req, res, next) => {
   try {
-    const reviewer = req.user?.name || 'HR Manager';
-    const data = await leaveService.updateLeaveStatus(req.params.id, req.body.status, reviewer);
+    const data = await leaveService.updateLeaveStatus(req.params.id, req.body.status, req.user);
     res.json({ success: true, data });
   } catch (error) {
     next(error);

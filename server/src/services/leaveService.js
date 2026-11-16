@@ -1,24 +1,15 @@
 const Leave = require('../models/Leave');
 const LeaveBalance = require('../models/LeaveBalance');
 const Employee = require('../models/Employee');
-const { getIsConnected } = require('../config/db');
-const { memoryStore } = require('./dataService');
+const Holiday = require('../models/Holiday');
 const ApiError = require('../errors/ApiError');
-
-// Company Public Holidays List (can be expanded/configured)
-const COMPANY_HOLIDAYS_2026 = [
-  '2026-01-01', // New Year's Day
-  '2026-01-26', // Republic Day
-  '2026-05-01', // Labor Day
-  '2026-08-15', // Independence Day
-  '2026-10-02', // Gandhi Jayanti
-  '2026-12-25'  // Christmas
-];
+const { logAudit } = require('./auditService');
+const { notifyByEmployeeId } = require('./notificationService');
 
 /**
- * Accurately calculate working days excluding Saturdays, Sundays & Public Holidays
+ * Accurately calculate working days excluding Saturdays, Sundays & Company Holidays from DB
  */
-const calculateWorkingDays = (startDateStr, endDateStr, holidays = COMPANY_HOLIDAYS_2026) => {
+const calculateWorkingDays = async (startDateStr, endDateStr, customHolidays = null) => {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
 
@@ -30,13 +21,21 @@ const calculateWorkingDays = (startDateStr, endDateStr, holidays = COMPANY_HOLID
     throw ApiError.badRequest('Start date cannot be after end date.');
   }
 
+  let holidays = customHolidays;
+  if (!holidays) {
+    const dbHolidays = await Holiday.find({
+      date: { $gte: startDateStr, $lte: endDateStr }
+    }).distinct('date');
+    holidays = dbHolidays;
+  }
+
   let workingDays = 0;
   const current = new Date(start);
 
   while (current <= end) {
     const dayOfWeek = current.getDay();
     const isoDate = current.toISOString().split('T')[0];
-    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // 0 = Sunday, 6 = Saturday
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
     const isHoliday = holidays.includes(isoDate);
 
     if (!isWeekend && !isHoliday) {
@@ -53,84 +52,52 @@ const calculateWorkingDays = (startDateStr, endDateStr, holidays = COMPANY_HOLID
  * Check for overlapping approved or pending leaves
  */
 const checkLeaveOverlap = async (employeeId, startDate, endDate, excludeId = null) => {
-  if (getIsConnected()) {
-    const query = {
-      employeeId,
-      status: { $in: ['Pending', 'Approved'] },
-      startDate: { $lte: endDate },
-      endDate: { $gte: startDate }
-    };
-    if (excludeId) {
-      query._id = { $ne: excludeId };
-    }
-    return await Leave.findOne(query);
+  const query = {
+    employeeId,
+    status: { $in: ['Pending', 'Approved'] },
+    startDate: { $lte: endDate },
+    endDate: { $gte: startDate }
+  };
+  if (excludeId) {
+    query._id = { $ne: excludeId };
   }
-
-  return memoryStore.leaves.find(l => 
-    l.employeeId === employeeId && 
-    ['Pending', 'Approved'].includes(l.status) && 
-    l.startDate <= endDate && 
-    l.endDate >= startDate &&
-    l.id !== excludeId
-  );
+  return await Leave.findOne(query);
 };
 
 /**
  * Retrieve or initialize LeaveBalance record
  */
 const getLeaveBalance = async (employeeId, year = new Date().getFullYear()) => {
-  if (getIsConnected()) {
-    let balance = await LeaveBalance.findOne({ employeeId, year });
-    if (!balance) {
-      balance = await LeaveBalance.create({ employeeId, year });
-    }
-    return balance;
+  let balance = await LeaveBalance.findOne({ employeeId, year });
+  if (!balance) {
+    balance = await LeaveBalance.create({ employeeId, year });
   }
-
-  // Dev fallback balance
-  return {
-    employeeId: employeeId || 'emp-1',
-    year,
-    balances: {
-      'Annual Leave': { total: 20, used: 5, remaining: 15 },
-      'Casual Leave': { total: 10, used: 2, remaining: 8 },
-      'Sick Leave': { total: 10, used: 1, remaining: 9 },
-      'Maternity/Paternity': { total: 90, used: 0, remaining: 90 },
-      'Unpaid': { total: 0, used: 0, remaining: 0 }
-    }
-  };
+  return balance;
 };
 
-const getAllLeaves = async (query = {}) => {
-  if (getIsConnected()) {
-    const filter = {};
-    if (query.employeeId) filter.employeeId = query.employeeId;
-    if (query.status && query.status !== 'All') filter.status = query.status;
-    return await Leave.find(filter).sort({ createdAt: -1 });
-  }
-
-  let list = memoryStore.leaves;
-  if (query.employeeId) list = list.filter(l => l.employeeId === query.employeeId);
-  if (query.status && query.status !== 'All') list = list.filter(l => l.status === query.status);
-  return list;
+const getAllLeaves = async (filter = {}) => {
+  return await Leave.find(filter).sort({ createdAt: -1 });
 };
 
-const createLeave = async (data) => {
-  const { startDate, endDate, leaveType, reason, employeeId } = data;
+const createLeave = async (data, user) => {
+  const { startDate, endDate, leaveType, reason } = data;
 
   if (!startDate || !endDate || !leaveType || !reason) {
     throw ApiError.badRequest('startDate, endDate, leaveType, and reason are required');
   }
 
-  // 1. Calculate actual working days excluding weekends & holidays
-  const calculatedDays = calculateWorkingDays(startDate, endDate);
+  // Security: Always bind leave to logged-in user's employeeId
+  const empId = user.employeeId;
+  if (!empId) {
+    throw ApiError.badRequest('No linked employee record found for this user account.');
+  }
+
+  const calculatedDays = await calculateWorkingDays(startDate, endDate);
   if (calculatedDays <= 0) {
     throw ApiError.badRequest('Selected date range contains no working days (all dates fall on weekends or holidays).');
   }
 
-  const empId = employeeId || 'emp-1';
-
-  // 2. Check for overlapping leaves
+  // Check for overlapping leaves
   const overlapping = await checkLeaveOverlap(empId, startDate, endDate);
   if (overlapping) {
     throw ApiError.badRequest(
@@ -138,7 +105,7 @@ const createLeave = async (data) => {
     );
   }
 
-  // 3. Verify leave balance
+  // Verify leave balance
   const year = new Date(startDate).getFullYear();
   const balanceRecord = await getLeaveBalance(empId, year);
 
@@ -153,35 +120,11 @@ const createLeave = async (data) => {
     }
   }
 
-  // Resolve employee name/avatar
-  let empName = data.employeeName || 'Sophia Martinez';
-  let empAvatar = data.employeeAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
+  const emp = await Employee.findById(empId);
+  const empName = emp ? emp.name : user.name;
+  const empAvatar = emp ? emp.avatar : undefined;
 
-  if (getIsConnected()) {
-    const emp = await Employee.findById(empId).catch(() => null);
-    if (emp) {
-      empName = emp.name;
-      empAvatar = emp.avatar || empAvatar;
-    }
-
-    const created = await Leave.create({
-      employeeId: empId,
-      employeeName: empName,
-      employeeAvatar: empAvatar,
-      leaveType,
-      startDate,
-      endDate,
-      daysCount: calculatedDays,
-      reason,
-      status: 'Pending',
-      appliedAt: new Date()
-    });
-
-    return created;
-  }
-
-  const newLeave = {
-    id: `lev-${Date.now()}`,
+  const created = await Leave.create({
     employeeId: empId,
     employeeName: empName,
     employeeAvatar: empAvatar,
@@ -191,47 +134,68 @@ const createLeave = async (data) => {
     daysCount: calculatedDays,
     reason,
     status: 'Pending',
-    appliedAt: new Date().toISOString()
-  };
-  memoryStore.leaves.unshift(newLeave);
-  return newLeave;
+    appliedAt: new Date()
+  });
+
+  return created;
 };
 
-const updateLeaveStatus = async (id, status, reviewer = 'HR Manager') => {
-  if (!['Pending', 'Approved', 'Rejected'].includes(status)) {
-    throw ApiError.badRequest("Status must be 'Pending', 'Approved', or 'Rejected'");
+const updateLeaveStatus = async (id, status, reviewerUser) => {
+  if (!['Approved', 'Rejected'].includes(status)) {
+    throw ApiError.badRequest("Status must be 'Approved' or 'Rejected'");
   }
 
-  if (getIsConnected()) {
-    const leave = await Leave.findById(id);
-    if (!leave) throw ApiError.notFound('Leave request not found');
-
-    const prevStatus = leave.status;
-    leave.status = status;
-    leave.reviewedBy = reviewer;
-    await leave.save();
-
-    // Deduct from LeaveBalance if Approved
-    const year = new Date(leave.startDate).getFullYear();
-    const balance = await getLeaveBalance(leave.employeeId, year);
-
-    if (leave.leaveType !== 'Unpaid' && balance.balances && balance.balances[leave.leaveType]) {
-      if (prevStatus !== 'Approved' && status === 'Approved') {
-        balance.balances[leave.leaveType].used += leave.daysCount;
-        await balance.save();
-      } else if (prevStatus === 'Approved' && status === 'Rejected') {
-        balance.balances[leave.leaveType].used = Math.max(0, balance.balances[leave.leaveType].used - leave.daysCount);
-        await balance.save();
-      }
-    }
-
-    return leave;
-  }
-
-  const leave = memoryStore.leaves.find(l => l.id === id || l._id?.toString() === id);
+  const leave = await Leave.findById(id);
   if (!leave) throw ApiError.notFound('Leave request not found');
+
+  // Prevent self-approval
+  if (leave.employeeId.toString() === reviewerUser.employeeId) {
+    throw ApiError.forbidden('You cannot approve or reject your own leave request.');
+  }
+
+  // If Manager, check that the employee belongs to their team
+  if (reviewerUser.role === 'Manager') {
+    const isTeamMember = await Employee.exists({ _id: leave.employeeId, manager: reviewerUser.employeeId });
+    if (!isTeamMember) {
+      throw ApiError.forbidden('Managers are only authorized to review leave requests for their assigned team members.');
+    }
+  }
+
+  const prevStatus = leave.status;
   leave.status = status;
-  leave.reviewedBy = reviewer;
+  leave.reviewedBy = reviewerUser.name;
+  await leave.save();
+
+  // Deduct from LeaveBalance if Approved
+  const year = new Date(leave.startDate).getFullYear();
+  const balance = await getLeaveBalance(leave.employeeId, year);
+
+  if (leave.leaveType !== 'Unpaid' && balance.balances && balance.balances[leave.leaveType]) {
+    if (prevStatus !== 'Approved' && status === 'Approved') {
+      balance.balances[leave.leaveType].used += leave.daysCount;
+      await balance.save();
+    } else if (prevStatus === 'Approved' && status === 'Rejected') {
+      balance.balances[leave.leaveType].used = Math.max(0, balance.balances[leave.leaveType].used - leave.daysCount);
+      await balance.save();
+    }
+  }
+
+  await logAudit({
+    user: reviewerUser,
+    action: `LEAVE_${status.toUpperCase()}`,
+    entityType: 'Leave',
+    entityId: leave._id,
+    details: { employeeName: leave.employeeName, leaveType: leave.leaveType, daysCount: leave.daysCount }
+  });
+
+  await notifyByEmployeeId({
+    employeeId: leave.employeeId,
+    title: `Leave Request ${status}`,
+    message: `Your ${leave.leaveType} leave (${leave.startDate} to ${leave.endDate}) was ${status.toLowerCase()} by ${reviewerUser.name}.`,
+    type: 'leave',
+    link: '/leaves'
+  });
+
   return leave;
 };
 

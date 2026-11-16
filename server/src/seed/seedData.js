@@ -1,5 +1,6 @@
-require('dotenv').config();
 const mongoose = require('mongoose');
+const env = require('../config/env');
+const User = require('../models/User');
 const Employee = require('../models/Employee');
 const Task = require('../models/Task');
 const Lead = require('../models/Lead');
@@ -9,15 +10,15 @@ const Payroll = require('../models/Payroll');
 const mockData = require('./mockData');
 
 const seedDatabase = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hrms';
-  console.log(`Connecting to MongoDB at: ${uri}`);
+  const uri = env.MONGODB_URI;
+  console.log(`[TaskOrbit HRMS Seed] Connecting to MongoDB: ${uri}`);
 
   try {
     await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
-    console.log('MongoDB connected successfully. Seeding database collections...');
+    console.log('[TaskOrbit HRMS Seed] Connected successfully. Purging existing collections...');
 
-    // Clear existing collections
     await Promise.all([
+      User.deleteMany({}),
       Employee.deleteMany({}),
       Task.deleteMany({}),
       Lead.deleteMany({}),
@@ -25,9 +26,8 @@ const seedDatabase = async () => {
       Leave.deleteMany({}),
       Payroll.deleteMany({})
     ]);
-    console.log('Cleared existing collections.');
 
-    // Seed Employees
+    // 1. Seed Employees
     const createdEmployees = await Employee.insertMany(mockData.employees.map(e => ({
       name: e.name,
       role: e.role,
@@ -40,13 +40,54 @@ const seedDatabase = async () => {
       joinDate: new Date(e.joinDate),
       location: e.location,
       performanceScore: e.performanceScore,
-      skills: e.skills,
-      reportsTo: e.reportsTo
+      skills: e.skills
     })));
-    console.log(`Seeded ${createdEmployees.length} employees.`);
+    console.log(`[TaskOrbit HRMS Seed] Seeded ${createdEmployees.length} employees.`);
 
-    // Seed Tasks
-    const createdTasks = await Task.insertMany(mockData.tasks.map(t => ({
+    // Set Manager hierarchy: First employee is CEO, next is manager for rest
+    if (createdEmployees.length > 2) {
+      const managerId = createdEmployees[1]._id;
+      for (let i = 2; i < createdEmployees.length; i++) {
+        createdEmployees[i].manager = managerId;
+        await createdEmployees[i].save();
+      }
+    }
+
+    // 2. Seed Super Admin User
+    const adminUser = await User.create({
+      name: 'Super Admin',
+      email: (env.ADMIN_EMAIL || 'admin@taskorbit.com').toLowerCase(),
+      password: env.ADMIN_PASSWORD || 'Admin@12345',
+      role: 'Admin',
+      employeeId: createdEmployees[0]._id,
+      isActive: true
+    });
+    console.log(`[TaskOrbit HRMS Seed] Seeded Super Admin: ${adminUser.email}`);
+
+    // Seed additional demo users linked to employees
+    if (createdEmployees.length > 1) {
+      await User.create({
+        name: createdEmployees[1].name,
+        email: createdEmployees[1].email.toLowerCase(),
+        password: 'Password@123',
+        role: 'Manager',
+        employeeId: createdEmployees[1]._id,
+        isActive: true
+      });
+
+      await User.create({
+        name: createdEmployees[2].name,
+        email: createdEmployees[2].email.toLowerCase(),
+        password: 'Password@123',
+        role: 'Employee',
+        employeeId: createdEmployees[2]._id,
+        isActive: true
+      });
+      console.log(`[TaskOrbit HRMS Seed] Seeded Manager & Employee test accounts.`);
+    }
+
+    // 3. Seed Tasks
+    await Task.insertMany(mockData.tasks.map(t => ({
       title: t.title,
       clientName: t.clientName,
       clientRole: t.clientRole,
@@ -60,10 +101,9 @@ const seedDatabase = async () => {
       isHighlight: t.isHighlight,
       attendees: t.attendees
     })));
-    console.log(`Seeded ${createdTasks.length} tasks.`);
 
-    // Seed Leads
-    const createdLeads = await Lead.insertMany(mockData.leads.map(l => ({
+    // 4. Seed Leads
+    await Lead.insertMany(mockData.leads.map(l => ({
       name: l.name,
       role: l.role,
       company: l.company,
@@ -76,11 +116,10 @@ const seedDatabase = async () => {
       dealValue: l.dealValue,
       status: l.status
     })));
-    console.log(`Seeded ${createdLeads.length} leads.`);
 
-    // Seed Attendance
-    const createdAttendance = await Attendance.insertMany(mockData.attendance.map((a, i) => ({
-      employeeId: createdEmployees[i % createdEmployees.length]._id.toString(),
+    // 5. Seed Attendance with valid ObjectId refs
+    await Attendance.insertMany(mockData.attendance.map((a, i) => ({
+      employeeId: createdEmployees[i % createdEmployees.length]._id,
       employeeName: a.employeeName,
       date: a.date,
       checkIn: a.checkIn,
@@ -89,11 +128,10 @@ const seedDatabase = async () => {
       status: a.status,
       workType: a.workType
     })));
-    console.log(`Seeded ${createdAttendance.length} attendance records.`);
 
-    // Seed Leaves
-    const createdLeaves = await Leave.insertMany(mockData.leaves.map((l, i) => ({
-      employeeId: createdEmployees[i % createdEmployees.length]._id.toString(),
+    // 6. Seed Leaves with valid ObjectId refs
+    await Leave.insertMany(mockData.leaves.map((l, i) => ({
+      employeeId: createdEmployees[i % createdEmployees.length]._id,
       employeeName: l.employeeName,
       employeeAvatar: l.employeeAvatar,
       leaveType: l.leaveType,
@@ -105,33 +143,41 @@ const seedDatabase = async () => {
       appliedAt: new Date(),
       reviewedBy: l.reviewedBy
     })));
-    console.log(`Seeded ${createdLeaves.length} leave records.`);
 
-    // Seed Payrolls
-    const createdPayrolls = await Payroll.insertMany(mockData.payrolls.map((p, i) => ({
-      employeeId: createdEmployees[i % createdEmployees.length]._id.toString(),
-      employeeName: p.employeeName,
-      employeeRole: p.employeeRole,
-      month: p.month,
-      baseSalary: p.baseSalary,
-      bonus: p.bonus,
-      allowance: p.allowance,
-      deductions: p.deductions,
-      tax: p.tax,
-      netPayable: p.netPayable,
-      paymentStatus: p.paymentStatus,
-      paymentDate: p.paymentDate,
-      paymentMethod: p.paymentMethod
-    })));
-    console.log(`Seeded ${createdPayrolls.length} payroll records.`);
+    // 7. Seed Payrolls with valid ObjectId refs
+    await Payroll.insertMany(mockData.payrolls.map((p, i) => {
+      const base = p.baseSalary || 65000;
+      return {
+        employeeId: createdEmployees[i % createdEmployees.length]._id,
+        employeeName: p.employeeName,
+        employeeRole: p.employeeRole,
+        department: 'Engineering',
+        month: p.month,
+        grossSalary: base + (p.allowance || 0),
+        basicPay: Math.round(base * 0.5),
+        hra: Math.round(base * 0.3),
+        specialAllowance: Math.round(base * 0.2),
+        baseSalary: base,
+        bonus: p.bonus || 0,
+        allowance: p.allowance || 0,
+        pfDeduction: Math.round(base * 0.06),
+        taxDeduction: p.tax || 0,
+        deductions: p.deductions || 0,
+        tax: p.tax || 0,
+        netPayable: p.netPayable,
+        paymentStatus: p.paymentStatus,
+        paymentDate: p.paymentDate,
+        paymentMethod: p.paymentMethod
+      };
+    }));
 
-    console.log('Seeding completed successfully!');
+    console.log('[TaskOrbit HRMS Seed] Seeding completed successfully!');
   } catch (error) {
-    console.error('Error during seeding:', error.message);
+    console.error('[TaskOrbit HRMS Seed] Error:', error.message);
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();
-    console.log('MongoDB disconnected.');
+    console.log('[TaskOrbit HRMS Seed] Database disconnected.');
   }
 };
 

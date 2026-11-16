@@ -1,22 +1,41 @@
 const mongoose = require('mongoose');
+const env = require('./env');
 
-let isConnected = false;
-
+/**
+ * Connect to MongoDB with production-grade configurations.
+ * If connection fails, the process exits with status code 1.
+ * Server listening ONLY occurs after this resolves successfully.
+ */
 const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hrms';
+  const uri = env.MONGODB_URI;
+
   try {
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 10000, // 10s timeout for Atlas or local
+      autoIndex: env.NODE_ENV !== 'production', // Don't build indexes on every prod request
+      maxPoolSize: 20 // Connection pool for concurrent requests
     });
-    isConnected = true;
-    console.log(`[TaskOrbit HRMS] MongoDB Connected: ${conn.connection.host}`);
+
+    console.log(`Database connected 🌳`);
+
+    // Listen for disconnections after initial startup
+    mongoose.connection.on('disconnected', () => {
+      console.warn('⚠️ [TaskOrbit HRMS] MongoDB connection lost! Retrying...');
+    });
+
+    mongoose.connection.on('error', (err) => {
+      console.error('❌ [TaskOrbit HRMS] MongoDB connection error:', err.message);
+    });
+
+    return conn;
   } catch (error) {
-    isConnected = false;
-    console.warn(`[TaskOrbit HRMS] Local MongoDB not detected (${error.message}).`);
-    console.warn(`[TaskOrbit HRMS] Falling back gracefully to High-Performance In-Memory DB Mode.`);
+    console.error(`===============================================`);
+    console.error(`❌ [TaskOrbit HRMS] CRITICAL: MongoDB connection failed!`);
+    console.error(`Reason: ${error.message}`);
+    console.error(`Server cannot start without a valid MongoDB connection.`);
+    console.error(`===============================================`);
+    process.exit(1);
   }
 };
 
-const getIsConnected = () => isConnected;
-
-module.exports = { connectDB, getIsConnected };
+module.exports = { connectDB };
