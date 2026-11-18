@@ -121,10 +121,10 @@ export default function NewTaskModal({ isOpen, onClose, onAddTask }) {
 
           {formData.taskType === 'Send Proposal' && (
             <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1">Amount / Package</label>
+              <label className="text-xs font-bold text-gray-700 block mb-1">Amount / Package (₹)</label>
               <input 
                 type="text" 
-                placeholder="$20,000"
+                placeholder="₹20,000"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black"

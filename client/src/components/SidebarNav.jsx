@@ -29,7 +29,7 @@ export default function SidebarNav() {
     { path: '/leaves', label: 'Time Off & Leaves', icon: Clock, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
     { path: '/holidays', label: 'Holidays', icon: CalendarHeart, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
     { path: '/employees', label: 'Employees', icon: Users, allowedRoles: ['Admin', 'HR', 'Manager'] },
-    { path: '/my-payslips', label: 'My Payslips', icon: FileText, allowedRoles: ['Admin', 'HR', 'Manager', 'Employee'] },
+    { path: '/my-payslips', label: 'My Payslips', icon: FileText, allowedRoles: ['Employee'] },
     { path: '/payroll', label: 'Payroll', icon: CreditCard, allowedRoles: ['Admin', 'HR'] },
     { path: '/audit-logs', label: 'Audit Logs', icon: ShieldAlert, allowedRoles: ['Admin'] },
     { path: '/settings', label: 'System Settings', icon: Settings, allowedRoles: ['Admin'] },

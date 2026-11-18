@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
     enum: ['Admin', 'HR', 'Manager', 'Employee'], 
     default: 'Employee' 
   },
+  avatar: { type: String },
   employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
   refreshToken: { type: String, select: false },
   isActive: { type: Boolean, default: true },

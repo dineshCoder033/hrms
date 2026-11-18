@@ -12,7 +12,7 @@ const jobSchema = new mongoose.Schema({
   },
   openings: { type: Number, default: 1 },
   applicantsCount: { type: Number, default: 0 },
-  salaryRange: { type: String, default: '$90k - $130k' },
+  salaryRange: { type: String, default: '₹8 LPA - ₹15 LPA' },
   status: { 
     type: String, 
     enum: ['Active', 'Draft', 'Closed'], 

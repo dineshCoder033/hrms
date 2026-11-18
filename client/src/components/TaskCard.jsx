@@ -98,7 +98,7 @@ export default function TaskCard({ task, onVideoJoin, onSendEmail, onStatusChang
             
             {task.amount ? (
               <p className={`text-xs font-semibold mt-0.5 ${isLime ? 'text-black/80' : 'text-gray-600'}`}>
-                Amount <span className="font-bold text-inherit">{task.amount}</span>
+                Amount <span className="font-bold text-inherit">{task.amount.replace(/\$/g, '₹')}</span>
               </p>
             ) : (
               <div className="flex items-center gap-2 mt-1">

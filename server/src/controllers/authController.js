@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const User = require('../models/User');
+const Employee = require('../models/Employee');
 const ApiError = require('../errors/ApiError');
 const env = require('../config/env');
 
@@ -214,6 +215,60 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+const updateProfileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+  email: z.string().email('Invalid email address').optional(),
+  avatar: z.string().optional()
+});
+
+const updateProfile = async (req, res, next) => {
+  try {
+    const validated = updateProfileSchema.parse(req.body);
+    const user = await User.findById(req.user.id);
+    if (!user) throw ApiError.notFound('User not found');
+
+    if (validated.email && validated.email.toLowerCase() !== user.email) {
+      const emailTaken = await User.findOne({
+        email: validated.email.toLowerCase(),
+        _id: { $ne: user._id }
+      });
+      if (emailTaken) {
+        throw ApiError.badRequest('This email address is already in use by another account.');
+      }
+      user.email = validated.email.toLowerCase();
+      if (user.employeeId) {
+        await Employee.findByIdAndUpdate(user.employeeId, { email: user.email });
+      }
+    }
+
+    if (validated.name) {
+      user.name = validated.name;
+      if (user.employeeId) {
+        await Employee.findByIdAndUpdate(user.employeeId, { name: user.name });
+      }
+    }
+
+    if (validated.avatar !== undefined) {
+      user.avatar = validated.avatar;
+      if (user.employeeId) {
+        await Employee.findByIdAndUpdate(user.employeeId, { avatar: validated.avatar });
+      }
+    }
+
+    await user.save();
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: user.toJSON()
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(ApiError.badRequest(error.errors[0]?.message || 'Validation error'));
+    }
+    next(error);
+  }
+};
+
 const logout = async (req, res, next) => {
   try {
     if (req.user?.id) {
@@ -237,6 +292,7 @@ module.exports = {
   refreshAccessToken,
   setPassword,
   changePassword,
+  updateProfile,
   me,
   logout
 };

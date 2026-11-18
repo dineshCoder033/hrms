@@ -50,8 +50,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = (newUserData) => {
+    setUser(prev => ({ ...prev, ...newUserData }));
+  };
+
   const value = {
     user,
+    setUser,
+    updateUser,
     token,
     loading,
     isAuthenticated: !!token && !!user,

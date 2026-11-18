@@ -193,11 +193,17 @@ export default function TopScheduleBar({ meetings = [], onOpenMeetings, onOpenNo
             title={`${user?.name || 'User'} Profile`}
           >
             <div className="relative">
-              <img 
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
-                alt="Profile" 
-                className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-200"
-              />
+              {user?.avatar ? (
+                <img 
+                  src={user.avatar} 
+                  alt={user.name || 'User'} 
+                  className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-black text-[#C7F436] font-bold text-xs flex items-center justify-center ring-1 ring-gray-200">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                </div>
+              )}
               <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[#C7F436] ring-1 ring-white"></span>
             </div>
             <div className="hidden sm:block text-left text-xs">

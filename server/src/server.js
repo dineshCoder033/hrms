@@ -9,7 +9,6 @@ const cookieParser = require('cookie-parser');
 const env = require('./config/env');
 
 const { connectDB } = require('./config/db');
-const { autoSeedIfEmpty } = require('./seed/initSeed');
 const routes = require('./routes');
 const { apiLimiter } = require('./middlewares/rateLimiter');
 const errorHandler = require('./errors/errorHandler');
@@ -40,8 +39,13 @@ const allowedOrigins = Array.from(new Set([...configuredOrigins, ...devOrigins])
 
 app.use(cors({
   origin: (origin, callback) => {
-    const normalized = origin ? origin.replace(/\/$/, '') : null;
-    if (!normalized || allowedOrigins.includes(normalized)) {
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalized)) {
+      return callback(null, true);
+    }
+    // Allow any localhost/127.0.0.1 port in non-production environments
+    if (env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) {
       return callback(null, true);
     }
     return callback(new ApiError(403, `CORS policy: Origin ${origin} not allowed`));
@@ -98,7 +102,6 @@ app.use(errorHandler);
 // Start Server & Connect Database (skipped in Jest test mode)
 const startServer = async () => {
   await connectDB();
-  await autoSeedIfEmpty();
 
   const server = app.listen(PORT, () => {
     console.log(`server running 🚀`);

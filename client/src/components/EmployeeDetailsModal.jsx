@@ -479,7 +479,7 @@ export default function EmployeeDetailsModal({
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-gray-600 block mb-1">Annual CTC ($ / ₹)</label>
+                  <label className="font-semibold text-gray-600 block mb-1">Annual CTC (₹ INR)</label>
                   <input
                     type="number"
                     value={formData.annualCtc}
@@ -778,13 +778,13 @@ export default function EmployeeDetailsModal({
                     <div>
                       <span className="text-gray-400 font-medium block">Annual CTC</span>
                       <p className="font-extrabold text-gray-900 text-base mt-0.5">
-                        ${(employee.annualCtc || employee.salary || 65000).toLocaleString()}
+                        ₹{(employee.annualCtc || employee.salary || 650000).toLocaleString()}
                       </p>
                     </div>
                     <div>
                       <span className="text-gray-400 font-medium block">Monthly Base</span>
                       <p className="font-extrabold text-gray-900 text-base mt-0.5">
-                        ${Math.round((employee.annualCtc || employee.salary || 65000) / 12).toLocaleString()}
+                        ₹{Math.round((employee.annualCtc || employee.salary || 650000) / 12).toLocaleString()}
                       </p>
                     </div>
                     <div>

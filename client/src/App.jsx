@@ -42,7 +42,14 @@ export default function App() {
             <Route path="leaves" element={<LeavesPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="recruitment" element={<RecruitmentPage />} />
-            <Route path="my-payslips" element={<MyPayslipsPage />} />
+            <Route
+              path="my-payslips"
+              element={
+                <ProtectedRoute allowedRoles={['Employee']}>
+                  <MyPayslipsPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="profile" element={<MyProfilePage />} />
 
             {/* Admin Restricted System Modules */}

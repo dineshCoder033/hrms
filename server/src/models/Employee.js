@@ -56,8 +56,8 @@ const employeeSchema = new mongoose.Schema({
   performanceScore: { type: Number, default: 90 },
 
   // Compensation, PF & ESI Eligibility
-  annualCtc: { type: Number, default: 65000 },
-  salary: { type: Number, default: 65000 },
+  annualCtc: { type: Number, default: 600000 },
+  salary: { type: Number, default: 600000 },
   isPfEligible: { type: Boolean, default: true },
   pfNumber: { type: String, trim: true },
   isEsiEligible: { type: Boolean, default: false },

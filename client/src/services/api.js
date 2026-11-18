@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const rawApiUrl = import.meta.env.VITE_API_URL;
+
+// Prevent accidental calls to dummy placeholder URLs (e.g. your-hrms-api.onrender.com)
+const isPlaceholder = !rawApiUrl || 
+  rawApiUrl.includes('your-hrms-api') || 
+  rawApiUrl.includes('your-backend-api') || 
+  rawApiUrl.includes('example.com') ||
+  rawApiUrl.includes('<');
+
+const API_BASE = isPlaceholder
+  ? (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api')
+  : rawApiUrl;
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -436,6 +447,11 @@ export const fetchOwnProfile = async () => {
 export const updateOwnProfile = async (data) => {
   const res = await api.patch('/employees/profile', data);
   return res.data.data;
+};
+
+export const updateUserProfile = async (data) => {
+  const res = await api.patch('/auth/profile', data);
+  return res.data;
 };
 
 export const changePassword = async (data) => {

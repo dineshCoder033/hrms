@@ -15,6 +15,7 @@ router.post('/refresh', authController.refreshAccessToken);
 
 // Current user profile
 router.get('/me', authenticate, authController.me);
+router.patch('/profile', authenticate, authController.updateProfile);
 
 // Change password (self-service for any authenticated user)
 router.post('/change-password', authenticate, authController.changePassword);

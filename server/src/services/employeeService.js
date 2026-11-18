@@ -121,7 +121,7 @@ const createEmployee = async (data) => {
   const fullName = data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Employee';
 
   // 3. Create Employee document
-  const annualCtc = Number(data.annualCtc || data.salary || 65000);
+  const annualCtc = Number(data.annualCtc || data.salary || 600000);
   const employee = await Employee.create({
     employeeCode,
     firstName: data.firstName,
@@ -318,7 +318,7 @@ const rowSchema = z.object({
   managerEmail: z.string().email().optional().or(z.literal('')),
   workMode: z.enum(['Office', 'Remote', 'Hybrid']).default('Office'),
   joinDate: z.string().optional(),
-  annualCtc: z.coerce.number().min(0).default(65000)
+  annualCtc: z.coerce.number().min(0).default(600000)
 });
 
 const previewBulkImport = async (parsedRows) => {

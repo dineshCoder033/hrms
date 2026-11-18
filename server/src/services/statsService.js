@@ -8,16 +8,18 @@ const ApiError = require('../errors/ApiError');
 
 const getStats = async () => {
   const today = new Date().toISOString().split('T')[0];
-  const [empCount, pendingLeaves, payrolls, attendanceToday, jobsCount] = await Promise.all([
+  const [empCount, pendingLeaves, payrolls, attendanceToday, totalAttendanceCount, jobsCount] = await Promise.all([
     Employee.countDocuments(),
     Leave.countDocuments({ status: 'Pending' }),
     Payroll.find(),
     Attendance.find({ date: today }),
+    Attendance.countDocuments(),
     Job.countDocuments({ status: 'Active' })
   ]);
 
   const totalPayroll = payrolls.reduce((acc, curr) => acc + (curr.netPayable || 0), 0);
   const presentCount = attendanceToday.filter(a => a.status === 'Present').length;
+  const absentCount = Math.max(0, empCount - presentCount);
   const attendanceRate = empCount > 0 ? Number(((presentCount / empCount) * 100).toFixed(1)) : 100.0;
 
   return {
@@ -27,7 +29,12 @@ const getStats = async () => {
     wonChange: '+8%',
     lostDeals: 36,
     lostChange: '-4%',
+    totalEmployees: empCount,
     activeEmployees: empCount,
+    totalAttendances: totalAttendanceCount,
+    todayPresent: presentCount,
+    todayAbsent: absentCount,
+    todayPayment: totalPayroll,
     totalPayroll: totalPayroll,
     attendanceRate: attendanceRate,
     pendingLeaves,

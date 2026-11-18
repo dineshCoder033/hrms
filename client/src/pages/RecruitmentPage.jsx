@@ -21,7 +21,7 @@ export default function RecruitmentPage(props) {
     department: 'Engineering',
     location: 'Remote',
     type: 'Full-time',
-    salaryRange: '$120k - $150k'
+    salaryRange: '₹12 LPA - ₹18 LPA'
   });
 
   const loadData = async () => {
@@ -56,7 +56,7 @@ export default function RecruitmentPage(props) {
         department: 'Engineering',
         location: 'Remote',
         type: 'Full-time',
-        salaryRange: '$120k - $150k'
+        salaryRange: '₹12 LPA - ₹18 LPA'
       });
       if (context.showToast) context.showToast('Job opening posted successfully!');
     } catch (err) {
@@ -127,7 +127,7 @@ export default function RecruitmentPage(props) {
                 <h4 className="font-extrabold text-sm text-gray-900 mt-2.5 leading-snug">{job.title}</h4>
                 <p className="text-xs text-gray-400 font-medium mt-1">{job.department} • {job.location}</p>
                 {job.salaryRange && (
-                  <p className="text-[11px] font-mono text-gray-600 mt-1 font-semibold">{job.salaryRange}</p>
+                  <p className="text-[11px] font-mono text-gray-600 mt-1 font-semibold">{job.salaryRange.replace(/\$/g, '₹')}</p>
                 )}
               </div>
 
@@ -305,9 +305,10 @@ export default function RecruitmentPage(props) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Salary Range</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Salary Range (₹ INR)</label>
                   <input
                     type="text"
+                    placeholder="e.g. ₹12 LPA - ₹18 LPA"
                     value={jobForm.salaryRange}
                     onChange={(e) => setJobForm({ ...jobForm, salaryRange: e.target.value })}
                     className="w-full text-xs font-medium p-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-black"
