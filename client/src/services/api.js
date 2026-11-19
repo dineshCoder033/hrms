@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const rawApiUrl = import.meta.env.VITE_API_URL;
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
 
 // Prevent accidental calls to dummy placeholder URLs (e.g. your-hrms-api.onrender.com)
 const isPlaceholder = !rawApiUrl || 
@@ -11,7 +11,7 @@ const isPlaceholder = !rawApiUrl ||
 
 const API_BASE = isPlaceholder
   ? (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api')
-  : rawApiUrl;
+  : (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`);
 
 const api = axios.create({
   baseURL: API_BASE,

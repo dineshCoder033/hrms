@@ -69,20 +69,27 @@ const calculateSalaryBreakdown = ({
   bonus = 0,
   extraAllowance = 0,
   workingDaysInMonth = 22,
-  config = { basicPercent: 0.50, hraPercent: 0.30, pfRate: 0.12, taxRate: 0.10 }
+  isPfEligible = false,
+  isEsiEligible = false,
+  config = { basicPercent: 0.50, hraPercent: 0.30, pfRate: 0.12, esiRate: 0.0075, taxRate: 0.10 }
 }) => {
   const grossMonthly = Math.round(annualSalary / 12);
-  const basicPay = Math.round(grossMonthly * config.basicPercent);
-  const hra = Math.round(grossMonthly * config.hraPercent);
+  const basicPay = Math.round(grossMonthly * (config.basicPercent ?? 0.50));
+  const hra = Math.round(grossMonthly * (config.hraPercent ?? 0.30));
   const specialAllowance = Math.max(0, grossMonthly - (basicPay + hra));
 
-  const pfDeduction = Math.round(basicPay * config.pfRate);
-  const taxDeduction = Math.round(grossMonthly * config.taxRate);
+  // PF calculated ONLY if employee is eligible
+  const pfDeduction = isPfEligible ? Math.round(basicPay * (config.pfRate ?? 0.12)) : 0;
+
+  // ESI calculated ONLY if employee is eligible
+  const esiDeduction = isEsiEligible ? Math.round(grossMonthly * (config.esiRate ?? 0.0075)) : 0;
+
+  const taxDeduction = Math.round(grossMonthly * (config.taxRate ?? 0.10));
 
   const perDaySalary = workingDaysInMonth > 0 ? (grossMonthly / workingDaysInMonth) : 0;
   const lopDeduction = Math.round(lopDays * perDaySalary);
 
-  const totalDeductions = pfDeduction + taxDeduction + lopDeduction;
+  const totalDeductions = pfDeduction + esiDeduction + taxDeduction + lopDeduction;
   const netPayable = Math.max(0, grossMonthly - totalDeductions + bonus + extraAllowance);
 
   return {
@@ -93,7 +100,10 @@ const calculateSalaryBreakdown = ({
     specialAllowance,
     bonus,
     allowance: extraAllowance,
+    isPfEligible,
+    isEsiEligible,
     pfDeduction,
+    esiDeduction,
     taxDeduction,
     tax: taxDeduction,
     lopDays,
@@ -163,11 +173,13 @@ const generateMonthlyPayrollRun = async (monthStr, user) => {
     const totalLopDays = unpaidLeaveDays + absentDays;
 
     const breakdown = calculateSalaryBreakdown({
-      annualSalary: emp.annualCtc || emp.salary || 65000,
+      annualSalary: emp.annualCtc || emp.salary || 600000,
       lopDays: totalLopDays,
       bonus: existing?.bonus || 0,
       extraAllowance: existing?.allowance || 0,
       workingDaysInMonth: workingDays,
+      isPfEligible: emp.isPfEligible !== false,
+      isEsiEligible: Boolean(emp.isEsiEligible),
       config
     });
 

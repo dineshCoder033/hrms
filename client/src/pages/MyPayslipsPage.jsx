@@ -177,7 +177,17 @@ export default function MyPayslipsPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">PF Deduction</span>
                 <span className="font-semibold text-rose-600">
-                  -₹{Number(selectedPayslip.payroll?.pfDeduction || 0).toLocaleString()}
+                  {Number(selectedPayslip.payroll?.pfDeduction || 0) > 0
+                    ? `-₹${Number(selectedPayslip.payroll?.pfDeduction).toLocaleString()}`
+                    : '₹0 (Exempt)'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">ESI Deduction</span>
+                <span className="font-semibold text-rose-600">
+                  {Number(selectedPayslip.payroll?.esiDeduction || 0) > 0
+                    ? `-₹${Number(selectedPayslip.payroll?.esiDeduction).toLocaleString()}`
+                    : '₹0 (Exempt)'}
                 </span>
               </div>
               <div className="flex justify-between">

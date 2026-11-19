@@ -6,6 +6,7 @@ const payrollConfigSchema = new mongoose.Schema({
   basicPercent: { type: Number, default: 0.50 },
   hraPercent: { type: Number, default: 0.30 },
   pfRate: { type: Number, default: 0.12 }, // 12% of Basic
+  esiRate: { type: Number, default: 0.0075 }, // 0.75% of Gross Salary for eligible employees
   taxRate: { type: Number, default: 0.10 }, // Flat 10% TDS placeholder
   weekendDays: { type: [Number], default: [0, 6] } // 0 = Sunday, 6 = Saturday
 }, schemaOptions);

@@ -389,8 +389,24 @@ export default function PayrollPage(props) {
                 <span className="font-mono font-bold">+₹{((selectedSlip.payroll.bonus || 0) + (selectedSlip.payroll.allowance || 0)).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-rose-600 pt-2 border-t border-gray-100">
-                <span>PF + TDS Deductions</span>
-                <span className="font-mono font-bold">-₹{((selectedSlip.payroll.pfDeduction || 0) + (selectedSlip.payroll.taxDeduction || 0)).toLocaleString()}</span>
+                <span>PF Deduction</span>
+                <span className="font-mono font-bold">
+                  {selectedSlip.payroll.pfDeduction > 0
+                    ? `-₹${selectedSlip.payroll.pfDeduction.toLocaleString()}`
+                    : '₹0 (Exempt)'}
+                </span>
+              </div>
+              <div className="flex justify-between text-rose-600">
+                <span>ESI Deduction</span>
+                <span className="font-mono font-bold">
+                  {selectedSlip.payroll.esiDeduction > 0
+                    ? `-₹${selectedSlip.payroll.esiDeduction.toLocaleString()}`
+                    : '₹0 (Exempt)'}
+                </span>
+              </div>
+              <div className="flex justify-between text-rose-600">
+                <span>TDS Tax Deduction</span>
+                <span className="font-mono font-bold">-₹{(selectedSlip.payroll.taxDeduction || selectedSlip.payroll.tax || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-rose-600">
                 <span>LOP ({selectedSlip.payroll.lopDays || 0} days)</span>
