@@ -115,7 +115,10 @@ export default function LoginPage() {
             className="w-full mt-3 bg-black hover:bg-neutral-800 text-white font-extrabold text-xs py-3.5 rounded-2xl transition shadow-md active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Connecting... (waking server up)</span>
+              </span>
             ) : (
               <>
                 <span>Sign In to Workspace</span>

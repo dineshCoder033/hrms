@@ -15,7 +15,7 @@ const API_BASE = isPlaceholder
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 60000, // 60s timeout to allow Render free tier cold-starts
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
@@ -67,6 +67,12 @@ api.interceptors.response.use(
         }
         return Promise.reject(refreshErr);
       }
+    }
+
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      return Promise.reject(
+        new Error('Server is waking up (Render free tier spin-up takes ~30-50s). Please wait a moment and try again!')
+      );
     }
 
     const errorMsg = error.response?.data?.message || error.message || 'Unknown network error';

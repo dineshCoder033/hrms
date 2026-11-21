@@ -11,9 +11,12 @@ const connectDB = async () => {
 
   try {
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 10000, // 10s timeout for Atlas or local
-      autoIndex: env.NODE_ENV !== 'production', // Don't build indexes on every prod request
-      maxPoolSize: 20 // Connection pool for concurrent requests
+      serverSelectionTimeoutMS: 15000,
+      autoIndex: env.NODE_ENV !== 'production',
+      maxPoolSize: 20, // Connection pool for concurrent requests
+      minPoolSize: 5,  // Keep 5 warm connections active to avoid TLS reconnection lag
+      socketTimeoutMS: 45000,
+      heartbeatFrequencyMS: 10000
     });
 
     console.log(`Database connected 🌳`);

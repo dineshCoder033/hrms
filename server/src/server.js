@@ -105,6 +105,24 @@ const startServer = async () => {
 
   const server = app.listen(PORT, () => {
     console.log(`server running 🚀`);
+
+    // Automatic Keep-Alive ping worker (prevents Render free tier from sleeping after 15m)
+    const rawExternalUrl = process.env.RENDER_EXTERNAL_URL || 'https://hrmsserver-stes.onrender.com';
+    if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+      const PING_INTERVAL = 13 * 60 * 1000; // Ping every 13 minutes
+      setInterval(async () => {
+        try {
+          const pingUrl = `${rawExternalUrl.replace(/\/$/, '')}/api/health`;
+          const res = await fetch(pingUrl);
+          if (res.ok) {
+            console.log(`[KeepAlive] Self-ping successful at ${new Date().toISOString()}`);
+          }
+        } catch (err) {
+          console.warn(`[KeepAlive] Ping failed:`, err.message);
+        }
+      }, PING_INTERVAL);
+      console.log(`[KeepAlive] Worker active: pinging ${rawExternalUrl}/api/health every 13 mins`);
+    }
   });
 
   // Graceful shutdown

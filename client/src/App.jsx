@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { checkHealth } from './services/api';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 
@@ -20,6 +21,11 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import SystemSettingsPage from './pages/SystemSettingsPage';
 
 export default function App() {
+  // Proactively ping backend to pre-warm cold server as soon as user opens frontend
+  useEffect(() => {
+    checkHealth().catch(() => {});
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
